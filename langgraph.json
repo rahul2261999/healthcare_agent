@@ -1,0 +1,7 @@
+{
+  "dependencies": ".",
+  "graphs": {
+    "appointment_agent": "src/agents/agent.py:appointment_agent"
+  },
+  "env": ".env"
+}

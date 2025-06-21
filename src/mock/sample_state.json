@@ -1,0 +1,22 @@
+{
+  "conversation_channel": "web",
+  "welcome_message": "Hi! I'm Alex, here to help you with your appointments. How can I assist you today?",
+  "otp_sent": false,
+  "customer": {
+    "id": "CUST-1001",
+    "name": "Jane Smith",
+    "phone_number": "+919876543210",
+    "dob": "22-07-2000"
+  },
+  "agent_branding": {
+    "name": "Alex Johnson",
+    "persona": "A friendly and efficient appointment coordinator who helps customers book, confirm, reschedule, or cancel their appointments with ease. Always clear, helpful, and focused on customer convenience.",
+    "tone": "Helpful and courteous"
+  },
+  "messages": [
+    {
+      "content": "hey",
+      "type": "human"
+    }
+  ]
+} 
