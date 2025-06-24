@@ -24,7 +24,7 @@ class CustomerStore:
             Customer(
                 id="CUST-1001",
                 name="John Doe",
-                phone_number="+15551234567",
+                phone_number="+14803828571",
                 dob="1990-05-15"
             ),
             Customer(

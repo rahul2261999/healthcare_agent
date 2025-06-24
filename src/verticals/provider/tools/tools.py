@@ -23,12 +23,12 @@ def welcome_message(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
     welcome_message = (
-        state["welcome_message"]
+        state.welcome_message
         or "Hello, I am your Ai assistant. I can help you with your appointment and order related queries."
     )
     tool_message = ToolMessage(content=welcome_message, tool_call_id=tool_call_id)
 
-    return Command(update={"messages": state["messages"] + [tool_message]})  # type: ignore
+    return Command(update={"messages": state.messages + [tool_message]})  # type: ignore
 
 
 @tool(
@@ -39,13 +39,13 @@ def list_appointments(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
-    print(f"Looking up appointment for customer {state['customer'].id}")
-    customer_id = state["customer"].id
+    print(f"Looking up appointment for customer {state.customer.id}")
+    customer_id = state.customer.id
 
     if customer_id is None or customer_id == "":
         return Command(
             update={
-                "messages": state["messages"]
+                "messages": state.messages
                 + [
                     ToolMessage(
                         content="Customer ID is required to get appointments",
@@ -59,7 +59,7 @@ def list_appointments(
 
     return Command(
         update={
-            "messages": state["messages"]
+            "messages": state.messages
             + [
                 ToolMessage(
                     content=f"Here are the appointments: {json.dumps(appointments)}",
@@ -102,13 +102,13 @@ def book_appointment(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
 
-    print(f"Booking appointment for customer {state['customer'].id}")
-    customer_id = state["customer"].id
+    print(f"Booking appointment for customer {state.customer.id}")
+    customer_id = state.customer.id
 
     if customer_id is None or customer_id == "":
         return Command(
             update={
-                "messages": state["messages"]
+                "messages": state.messages
                 + [
                     ToolMessage(
                         content="Customer ID is required to book appointment",
@@ -130,7 +130,7 @@ def book_appointment(
 
     return Command(
         update={
-            "messages": state["messages"]
+            "messages": state.messages
             + [
                 ToolMessage(
                     content=f"Appointment booked successfully for {date} at {time}",
@@ -159,13 +159,13 @@ def confirm_appointment(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
-    print(f"Confirming appointment for customer {state['customer'].id}")
-    customer_id = state["customer"].id
+    print(f"Confirming appointment for customer {state.customer.id}")
+    customer_id = state.customer.id
 
     if customer_id is None or customer_id == "":
         return Command(
             update={
-                "messages": state["messages"]
+                "messages": state.messages
                 + [
                     ToolMessage(
                         content="Customer ID is required to confirm appointment",
@@ -180,21 +180,21 @@ def confirm_appointment(
     if appointment is None:
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} not found", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} not found", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
     if appointment.status == AppointmentStatus.CONFIRMED:
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} is already confirmed", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} is already confirmed", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
     if appointment.status == AppointmentStatus.COMPLETED:
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} is already completed", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} is already completed", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
@@ -204,7 +204,7 @@ def confirm_appointment(
 
     return Command(
         update={
-            "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} confirmed successfully", tool_call_id=tool_call_id)]  # type: ignore
+            "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} confirmed successfully", tool_call_id=tool_call_id)]  # type: ignore
         }
     )
 
@@ -226,13 +226,13 @@ def cancel_appointment(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
-    print(f"Cancelling appointment for customer {state['customer'].id}")
-    customer_id = state["customer"].id
+    print(f"Cancelling appointment for customer {state.customer.id}")
+    customer_id = state.customer.id
 
     if customer_id is None or customer_id == "":
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content="Customer ID is required to cancel appointment", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content="Customer ID is required to cancel appointment", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
@@ -241,14 +241,14 @@ def cancel_appointment(
     if appointment is None:
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} not found", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} not found", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
     if appointment.status == AppointmentStatus.COMPLETED:
         return Command(
             update={
-                "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} is already completed, cannot be cancelled", tool_call_id=tool_call_id)]  # type: ignore
+                "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} is already completed, cannot be cancelled", tool_call_id=tool_call_id)]  # type: ignore
             }
         )
 
@@ -258,6 +258,6 @@ def cancel_appointment(
 
     return Command(
         update={
-            "messages": state["messages"] + [ToolMessage(content=f"Appointment {appointment_id} cancelled successfully", tool_call_id=tool_call_id)]  # type: ignore
+            "messages": state.messages + [ToolMessage(content=f"Appointment {appointment_id} cancelled successfully", tool_call_id=tool_call_id)]  # type: ignore
         }
     )

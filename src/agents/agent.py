@@ -1,3 +1,4 @@
+import os
 from typing import TypedDict
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import START, StateGraph, END
@@ -12,9 +13,12 @@ from src.verticals.provider.tools import (
 )
 from langchain_mistralai import ChatMistralAI
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
+from pydantic import SecretStr
 import json
 from src.verticals.provider.prompts import agent_prompt
+from langgraph.checkpoint.memory import MemorySaver
 
 
 class Configuration(TypedDict):
@@ -24,9 +28,8 @@ class Configuration(TypedDict):
     See: https://langchain-ai.github.io/langgraph/cloud/how-tos/configuration_cloud/
     """
 
-    model_name: str
     recursion_limit: int
-    thread_id: int
+    thread_id: str
 
 
 tools = [
@@ -43,7 +46,7 @@ tools_by_name = {tool.name: tool for tool in tools}
 def agent_node(state: State, config: RunnableConfig):
     system_prompt = agent_prompt(state)
 
-    messages = [SystemMessage(content=system_prompt)] + state["messages"]
+    messages = [SystemMessage(content=system_prompt)] + state.messages
 
     # llm = ChatMistralAI(
     #     model_name="mistral-large-latest",
@@ -51,12 +54,14 @@ def agent_node(state: State, config: RunnableConfig):
     # ).bind_tools(tools)
 
     llm = ChatAnthropic(
-        model_name="claude-3-5-haiku-latest",
+        model_name="claude-sonnet-4-20250514",
         temperature=0.0,
         max_retries=2,
         timeout=10,
         stop=None,
     ).bind_tools(tools)
+
+
 
     response = llm.invoke(messages)
 
@@ -66,7 +71,7 @@ def agent_node(state: State, config: RunnableConfig):
 def tool_node(state: State):
     outputs = []
 
-    last_message = state["messages"][-1]
+    last_message = state.messages[-1]
 
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
         print(f"Tool calls: {last_message.tool_calls}")
@@ -90,7 +95,7 @@ def tool_node(state: State):
 
 # Define the conditional edge that determines whether to continue or not
 def should_continue(state: State):
-    messages = state["messages"]
+    messages = state.messages   
 
     last_message = messages[-1]
 
@@ -104,7 +109,7 @@ def should_continue(state: State):
 
 def build_agent():
 
-    agent_builder = StateGraph(State, Configuration)
+    agent_builder = StateGraph(State, config_schema=Configuration)
 
     agent_builder.add_node("agent", agent_node)
     agent_builder.add_node("tools", ToolNode(tools))
