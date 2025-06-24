@@ -76,7 +76,7 @@ async def inbound_call(
         welcome_greeting="Hello, I am your Ai assistant. I can help you with your appointment and order related queries.",
         welcome_greeting_interruptible=InterruptibleEnum.speech,
         # voice="dMyQqiVXTU80dDl2eNK8",
-        voice="dMyQqiVXTU80dDl2eNK8-flash_v2_5-0.8_0.6_0.8",
+        voice="uYXf8XasLslADfZ2MB4u-flash_v2_5-0.8_0.6_0.8",
     )
 
     conversation_relay_kwargs = conversation_relay_attributes.model_dump(
