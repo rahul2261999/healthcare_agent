@@ -35,4 +35,4 @@ if FILE_LEVEL not in VALID_LOG_LEVELS:
     FILE_LEVEL = "DEBUG"
 
 # Log file name format
-LOG_FILE_FORMAT = "app_{time}.log" 
+LOG_FILE_FORMAT = "app_{time:YYYY-MM-DD}.log" 
