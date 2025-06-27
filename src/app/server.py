@@ -14,8 +14,7 @@ async def health_check():
     if not session:
         session = customer_session_store.create_session("+14803828571", "voice")
     
-    response = await generate_response("Hello, how are you?", session)
-    print(response)
+    await generate_response("hey", session, print)
     
 
     """Simple liveness probe endpoint."""

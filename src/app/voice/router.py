@@ -7,15 +7,15 @@ from fastapi import (
     HTTPException,
 )
 from fastapi.responses import Response, JSONResponse
-from typing import Any, Dict, cast
+from typing import Any, Dict, Callable
 
 from langchain_core.runnables import RunnableConfig
-from langchain_core.messages import AIMessage, HumanMessage, AIMessageChunk
+from langchain_core.messages import HumanMessage, AIMessageChunk
 from twilio.twiml.voice_response import Connect, ConversationRelay
 from pprint import pformat
 
-from src.agents.agent import appointment_agent
-from src.agents.state import AgentBranding, State
+from src.agents.appointment_agent.agent import appointment_agent, checkpointer
+from src.agents.state import AgentBranding, State, AuthenticationState
 from src.lib.logger import logger
 from src.mock.customer import customer_store
 from src.mock.customer_sessions import customer_session_store, CustomerSession
@@ -73,7 +73,7 @@ async def inbound_call(
 
     conversation_relay_attributes = ConversationRelayAttributes(
         url=websocket_url,
-        welcome_greeting="Hello, I am your Ai assistant. I can help you with your appointment and order related queries.",
+        welcome_greeting="Welcome to the Appollo Clinic. How can I help you today?",
         welcome_greeting_interruptible=InterruptibleEnum.speech,
         # voice="dMyQqiVXTU80dDl2eNK8",
         voice="uYXf8XasLslADfZ2MB4u-flash_v2_5-0.8_0.6_0.8",
@@ -148,24 +148,28 @@ async def conversation_relay_ws(
                 prompt_msg = CRPromptMessage(**raw_msg)
                 logger.debug(f"Prompt received: {prompt_msg.voicePrompt}")
 
-                response_message = await generate_response(
-                    prompt_msg.voicePrompt, session
+                # Define callback to stream tokens as they arrive
+                async def stream_callback(token: str, is_last: bool = False):
+                    outbound_msg = CRTextMessage(
+                        token=token,
+                        last=is_last,
+                        interruptible=False,
+                        preemptible=False,
+                    )
+
+                    logger.debug(
+                        f"Streaming token: {outbound_msg.model_dump(mode='json', exclude_none=True)}"
+                    )
+
+                    await websocket.send_json(
+                        outbound_msg.model_dump(mode="json", exclude_none=True)
+                    )
+
+                # Generate response with streaming callback
+                await generate_response(
+                    prompt_msg.voicePrompt, session, stream_callback
                 )
 
-                outbound_msg = CRTextMessage(
-                    token=response_message,
-                    last=True,
-                    interruptible=True,
-                    preemptible=False,
-                )
-
-                logger.debug(
-                    f"Sending response: {outbound_msg.model_dump(mode='json', exclude_none=True)}"
-                )
-
-                await websocket.send_json(
-                    outbound_msg.model_dump(mode="json", exclude_none=True)
-                )
                 continue
 
             elif inbound.type == ConversationRelayMessageTypeEnum.error:
@@ -199,8 +203,8 @@ async def conversation_relay_ws(
 
 
 async def generate_response(
-    text: str, session: CustomerSession
-) -> str:  # noqa: D401 – simple helper
+    text: str, session: CustomerSession, stream_callback: Callable
+):
     """Generate a placeholder response.
 
     This function is intentionally simple. In production you would replace this logic
@@ -208,7 +212,6 @@ async def generate_response(
     """
 
     try:
-
         customer = customer_store.find_customer_by_phone_number(session.phone_number)
 
         if not customer:
@@ -221,35 +224,95 @@ async def generate_response(
             }
         }
 
-        initial_state = State(
-            messages=[HumanMessage(content=text)],
-            conversation_channel="voice",
-            welcome_message="Hello, I am your Ai assistant. I can help you with your appointment related queries.",
-            otp_sent=False,
-            customer=customer,
-            agent_branding=AgentBranding(
-                name="Amelia",
-                persona="Helpful and courteous",
-                tone="Helpful and Casual",
-            ),
-        )
+        get_config = checkpointer.get(config)
 
-        response = ""
+        if get_config is None:
+            logger.info(f"No config found for thread {session.session_id}, creating new state")
+            initial_state = State(
+                active_node="",
+                messages=[HumanMessage(content=text)],
+                conversation_channel="voice",
+                welcome_message="Welcome to the Appollo Clinic. How can I help you today?",
+                customer=customer,
+                agent_branding=AgentBranding(
+                    name="Amelia",
+                    persona="Helpful and courteous",
+                    tone="Helpful and Casual",
+                ),
+                authentication=AuthenticationState(
+                    is_authorized=False,
+                    otp_sent=False,
+                ),
+            )
 
-        async for token, metadata in appointment_agent.astream(
-            initial_state.model_dump(), config=config, stream_mode="messages"
-        ):
-            # Pretty-print the streamed LLM token and its accompanying metadata for easier debugging
+            response = ""
 
-            if isinstance(token, AIMessageChunk) and len(token.tool_calls) == 0 and isinstance(token.content, list) and len(token.content) > 0:
+            async for token, metadata in appointment_agent.astream(
+                initial_state.model_dump(), config=config, stream_mode="messages"
+            ):
+                # Pretty-print the streamed LLM token and its accompanying metadata for easier debugging
+                logger.debug(f"Token:\n {pformat(token, indent=2)}")
+                logger.trace(f"Metadata:\n {pformat(metadata)}")
 
-                if isinstance(token.content[0], dict) and token.content[0]["type"] == "text":
-                    logger.trace(f"Token:\n {pformat(token, indent=2)}")
-                    logger.trace(f"Metadata:\n {pformat(metadata)}")
+                if isinstance(token, AIMessageChunk) and isinstance(token.content, str):
+                    response += token.content
+                    await stream_callback(token.content, False)
 
-                    response += token.content[0]["text"]
+                # if (
+                #     isinstance(token, AIMessageChunk)
+                #     and isinstance(token.content, list)
+                #     and len(token.content) > 0
+                # ):
+                #     if (
+                #         isinstance(token.content[0], dict)
+                #         and token.content[0]["type"] == "text"
+                #     ):
 
-        return response
+                #         token_text = token.content[0]["text"]
+                #         response += token_text
+
+                #         # Call the stream_callback for each new token
+                #         await stream_callback(token_text, False)
+
+            # Call the stream_callback to indicate end of stream
+            logger.debug(f"Full response generated {response}")
+            await stream_callback("", True)
+
+        else:
+            logger.info(f"Config found for thread {session.session_id}, resuming state")
+            response = ""
+
+            async for token, metadata in appointment_agent.astream(
+                {"messages": text}, config=config, stream_mode="messages"
+            ):
+                # Pretty-print the streamed LLM token and its accompanying metadata for easier debugging
+                logger.debug(f"Token:\n {pformat(token, indent=2)}")
+                logger.trace(f"Metadata:\n {pformat(metadata)}")
+
+                if isinstance(token, AIMessageChunk) and isinstance(token.content, str):
+                    response += token.content
+                    await stream_callback(token.content, False)
+
+                # if (
+                #     isinstance(token, AIMessageChunk)
+                #     and isinstance(token.content, list)
+                #     and len(token.content) > 0
+                # ):
+                #     if (
+                #         isinstance(token.content[0], dict)
+                #         and token.content[0]["type"] == "text"
+                #     ):
+
+                #         token_text = token.content[0]["text"]
+                #         response += token_text
+
+                #         # Call the stream_callback for each new token
+                #         await stream_callback(token_text, False)
+
+            # Call the stream_callback to indicate end of stream
+            logger.debug(f"Full response generated {response}")
+            await stream_callback("", True)
+
     except Exception as e:
         logger.error(f"Error generating response: {e}")
 

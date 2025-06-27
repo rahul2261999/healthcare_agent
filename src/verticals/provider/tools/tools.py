@@ -10,7 +10,7 @@ from src.mock.provider import providerStore, Appointment, AppointmentStatus
 import uuid
 from .tool_types import ToolName
 from src.utils.datetime import get_current_datetime_in_ist
-
+from src.verticals.authentication.tools import validate_authorization
 
 @tool(
     ToolName.WELCOME_MESSAGE.value,
@@ -24,7 +24,7 @@ def welcome_message(
 ):
     welcome_message = (
         state.welcome_message
-        or "Hello, I am your Ai assistant. I can help you with your appointment and order related queries."
+        or "Hello, I am your Ai assistant. I can help you with your appointment related queries."
     )
     tool_message = ToolMessage(content=welcome_message, tool_call_id=tool_call_id)
 
@@ -39,6 +39,13 @@ def list_appointments(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
+
+    auth_result = validate_authorization(state, tool_call_id)
+
+    if not auth_result[0]:
+        return auth_result[1]
+
+    
     print(f"Looking up appointment for customer {state.customer.id}")
     customer_id = state.customer.id
 
@@ -102,6 +109,11 @@ def book_appointment(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
 
+    auth_result = validate_authorization(state, tool_call_id)
+
+    if not auth_result[0]:
+        return auth_result[1]
+
     print(f"Booking appointment for customer {state.customer.id}")
     customer_id = state.customer.id
 
@@ -159,6 +171,12 @@ def confirm_appointment(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
+
+    auth_result = validate_authorization(state, tool_call_id)
+
+    if not auth_result[0]:
+        return auth_result[1]
+
     print(f"Confirming appointment for customer {state.customer.id}")
     customer_id = state.customer.id
 
@@ -226,6 +244,12 @@ def cancel_appointment(
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ):
+
+    auth_result = validate_authorization(state, tool_call_id)
+
+    if not auth_result[0]:
+        return auth_result[1]
+
     print(f"Cancelling appointment for customer {state.customer.id}")
     customer_id = state.customer.id
 

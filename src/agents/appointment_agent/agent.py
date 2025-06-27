@@ -1,9 +1,8 @@
-import os
 from typing import TypedDict
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import START, StateGraph, END
 from langgraph.prebuilt import ToolNode
-from src.agents.state import State
+from src.agents.state import State, IntentIdentificationResponse
 from src.verticals.provider.tools import (
     welcome_message,
     list_appointments,
@@ -11,14 +10,16 @@ from src.verticals.provider.tools import (
     confirm_appointment,
     cancel_appointment,
 )
+from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
-from pydantic import SecretStr
 import json
 from src.verticals.provider.prompts import agent_prompt
+from src.verticals.authentication import authentication_prompt, send_otp, verify_otp
 from langgraph.checkpoint.memory import MemorySaver
+from src.verticals.intent_identification.prompt import intent_identification_prompt
+from src.lib.logger import logger
 
 
 class Configuration(TypedDict):
@@ -32,7 +33,7 @@ class Configuration(TypedDict):
     thread_id: str
 
 
-tools = [
+appointment_tools = [
     welcome_message,
     list_appointments,
     book_appointment,
@@ -40,33 +41,31 @@ tools = [
     cancel_appointment,
 ]
 
+authentication_tools = [
+    send_otp,
+    verify_otp,
+]
+
+tools = appointment_tools + authentication_tools
+
 tools_by_name = {tool.name: tool for tool in tools}
 
 
-def agent_node(state: State, config: RunnableConfig):
+def appointment_node(state: State, config: RunnableConfig):
     system_prompt = agent_prompt(state)
 
     messages = [SystemMessage(content=system_prompt)] + state.messages
 
-    # llm = ChatMistralAI(
-    #     model_name="mistral-large-latest",
-    #     temperature=0.0,
-    # ).bind_tools(tools)
-
-    llm = ChatAnthropic(
-        model_name="claude-sonnet-4-20250514",
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
         temperature=0.0,
         max_retries=2,
         timeout=10,
-        stop=None,
     ).bind_tools(tools)
-
-
 
     response = llm.invoke(messages)
 
-    return {"messages": [response]}
-
+    return {"messages": [response], "active_node": "appointment_node"}
 
 def tool_node(state: State):
     outputs = []
@@ -95,7 +94,7 @@ def tool_node(state: State):
 
 # Define the conditional edge that determines whether to continue or not
 def should_continue(state: State):
-    messages = state.messages   
+    messages = state.messages
 
     last_message = messages[-1]
 
@@ -107,25 +106,32 @@ def should_continue(state: State):
         return "continue"
 
 
-def build_agent():
-
+def build_agent(add_checkpoint: bool = False):
     agent_builder = StateGraph(State, config_schema=Configuration)
 
-    agent_builder.add_node("agent", agent_node)
+    agent_builder.add_node("appointment_node", appointment_node)
     agent_builder.add_node("tools", ToolNode(tools))
 
-    agent_builder.add_edge(START, "agent")
+    agent_builder.add_edge(START, "appointment_node")
+
+
     agent_builder.add_conditional_edges(
-        "agent",
+        "appointment_node",
         should_continue,
         {
             "continue": "tools",
             "end": END,
         },
     )
-    agent_builder.add_edge("tools", "agent")
 
-    return agent_builder.compile(name="appointment_agent")
+    agent_builder.add_edge("tools", "appointment_node")
 
+    if add_checkpoint:
+        logger.info("Compiling with checkpoint")
+        return agent_builder.compile(name="provider_agent", checkpointer=checkpointer)
+    else:
+        return agent_builder.compile(name="provider_agent")
 
-appointment_agent = build_agent()
+checkpointer=MemorySaver()
+appointment_agent = build_agent(add_checkpoint=True)
+langgraph_agent = build_agent(add_checkpoint=False)

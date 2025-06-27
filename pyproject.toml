@@ -13,7 +13,6 @@ dependencies = [
     "langchain-anthropic>=0.3.15",
     "langchain-mistralai>=0.2.10",
     "langgraph>=0.4.8",
-    "langgraph-cli[inmem]>=0.3.3",
     "loguru>=0.7.3",
     "pytz>=2025.2",
     "twilio>=9.6.3",
@@ -21,6 +20,7 @@ dependencies = [
     "pydantic-settings>=2.2.1",
     "pydantic>=2.11.7",
     "langchain-openai>=0.3.25",
+    "langgraph-cli[inmem]>=0.3.3",
 ]
 
 [tool.setuptools.packages.find]

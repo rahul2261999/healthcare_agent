@@ -1,5 +1,5 @@
 from typing import TypedDict
-from src.core.prebuilt.tools.tool_types import ToolDefinition
+from src.core.prebuilt.types.tool_types import ToolDefinition
 from enum import Enum
 
 class ToolName(str, Enum):
