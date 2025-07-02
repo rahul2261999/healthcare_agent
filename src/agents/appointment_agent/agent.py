@@ -2,7 +2,7 @@ from typing import TypedDict
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import START, StateGraph, END
 from langgraph.prebuilt import ToolNode
-from src.agents.state import State, IntentIdentificationResponse
+from src.agents.state import State
 from src.verticals.provider.tools import (
     welcome_message,
     list_appointments,
@@ -10,17 +10,14 @@ from src.verticals.provider.tools import (
     confirm_appointment,
     cancel_appointment,
 )
-from langchain_openai import ChatOpenAI
-from langchain_mistralai import ChatMistralAI
-from langchain_anthropic import ChatAnthropic
+from langchain.chat_models import init_chat_model
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
 import json
 from src.verticals.provider.prompts import agent_prompt
-from src.verticals.authentication import authentication_prompt, send_otp, verify_otp
+from src.verticals.authentication import send_otp, verify_otp
 from langgraph.checkpoint.memory import MemorySaver
-from src.verticals.intent_identification.prompt import intent_identification_prompt
 from src.lib.logger import logger
-
+from src.core.prebuilt.types.llm_provider import LLMProvider, LLMModel
 
 class Configuration(TypedDict):
     """Configurable parameters for the agent.
@@ -56,8 +53,9 @@ def appointment_node(state: State, config: RunnableConfig):
 
     messages = [SystemMessage(content=system_prompt)] + state.messages
 
-    llm = ChatOpenAI(
-        model="gpt-4o-mini",
+    llm = init_chat_model(
+        model=LLMModel.CLAUDE_3_HAIKU_20240307.value,
+        model_provider=LLMProvider.ANTHROPIC.value,
         temperature=0.0,
         max_retries=2,
         timeout=10,
@@ -66,6 +64,7 @@ def appointment_node(state: State, config: RunnableConfig):
     response = llm.invoke(messages)
 
     return {"messages": [response], "active_node": "appointment_node"}
+
 
 def tool_node(state: State):
     outputs = []
@@ -114,7 +113,6 @@ def build_agent(add_checkpoint: bool = False):
 
     agent_builder.add_edge(START, "appointment_node")
 
-
     agent_builder.add_conditional_edges(
         "appointment_node",
         should_continue,
@@ -132,6 +130,7 @@ def build_agent(add_checkpoint: bool = False):
     else:
         return agent_builder.compile(name="provider_agent")
 
-checkpointer=MemorySaver()
+
+checkpointer = MemorySaver()
 appointment_agent = build_agent(add_checkpoint=True)
 langgraph_agent = build_agent(add_checkpoint=False)

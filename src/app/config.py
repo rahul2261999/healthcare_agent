@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     # Base host used when constructing public URLs (e.g., ngrok host)
     app_base_host: str = Field("localhost:8000", alias="APP_BASE_HOST")
 
-
     # ---------------------------------------------------------------------
     # Logging levels
     # ---------------------------------------------------------------------
