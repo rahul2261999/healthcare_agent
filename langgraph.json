@@ -1,7 +1,8 @@
 {
   "dependencies": ".",
   "graphs": {
-    "appointment_agent": "src/agents/appointment_agent/agent.py:langgraph_agent"
+    "appointment_agent": "src/agents/appointment_agent/agent.py:langgraph_agent",
+    "multi_agent": "src/agents/multi_agent/agent.py:langgraph_multi_agent"
   },
   "env": ".env"
 }

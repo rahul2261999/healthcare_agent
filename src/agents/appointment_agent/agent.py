@@ -54,8 +54,8 @@ def appointment_node(state: State, config: RunnableConfig):
     messages = [SystemMessage(content=system_prompt)] + state.messages
 
     llm = init_chat_model(
-        model=LLMModel.CLAUDE_3_HAIKU_20240307.value,
-        model_provider=LLMProvider.ANTHROPIC.value,
+        model=LLMModel.GPT_4O.value,
+        model_provider=LLMProvider.OPENAI.value,
         temperature=0.0,
         max_retries=2,
         timeout=10,
@@ -63,7 +63,7 @@ def appointment_node(state: State, config: RunnableConfig):
 
     response = llm.invoke(messages)
 
-    return {"messages": [response], "active_node": "appointment_node"}
+    return {"messages": [response]}
 
 
 def tool_node(state: State):

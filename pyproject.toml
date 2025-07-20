@@ -22,6 +22,7 @@ dependencies = [
     "langchain-openai>=0.3.25",
     "langgraph-cli[inmem]>=0.3.3",
     "langchain>=0.3.26",
+    "langfuse>=3.2.0",
 ]
 
 [tool.setuptools.packages.find]
