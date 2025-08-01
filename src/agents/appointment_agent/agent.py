@@ -18,6 +18,8 @@ from src.verticals.authentication import send_otp, verify_otp
 from langgraph.checkpoint.memory import MemorySaver
 from src.lib.logger import logger
 from src.core.prebuilt.types.llm_provider import LLMProvider, LLMModel
+from langfuse.langchain import CallbackHandler
+langfuse_handler = CallbackHandler()
 
 class Configuration(TypedDict):
     """Configurable parameters for the agent.
@@ -126,9 +128,12 @@ def build_agent(add_checkpoint: bool = False):
 
     if add_checkpoint:
         logger.info("Compiling with checkpoint")
-        return agent_builder.compile(name="provider_agent", checkpointer=checkpointer)
+        compiled = agent_builder.compile(name="provider_agent", checkpointer=checkpointer)
     else:
-        return agent_builder.compile(name="provider_agent")
+        compiled = agent_builder.compile(name="provider_agent")
+
+    # Attach Langfuse callback handler for tracing
+    return compiled.with_config({"callbacks": [langfuse_handler]})
 
 
 checkpointer = MemorySaver()

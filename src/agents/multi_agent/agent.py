@@ -23,6 +23,8 @@ from langgraph.types import Command
 from langgraph.prebuilt import InjectedState
 from typing import Annotated
 from langchain_core.tools import InjectedToolCallId, tool
+from langfuse.langchain import CallbackHandler
+langfuse_handler = CallbackHandler()
 
 
 class Configuration(TypedDict):
@@ -224,6 +226,8 @@ def build_agent(add_checkpoint: bool = False):
     else:
         appointment_agent = appointment_agent_builder.compile(name="appointment_agent")
 
+    # Attach Langfuse tracing to appointment agent
+    appointment_agent = appointment_agent.with_config({"callbacks": [langfuse_handler]})
 
 
     auth_agent_builder = StateGraph(State, config_schema=Configuration)
@@ -245,6 +249,9 @@ def build_agent(add_checkpoint: bool = False):
     else:
         auth_agent = auth_agent_builder.compile(name="auth_agent")
 
+    # Attach Langfuse tracing to authentication agent
+    auth_agent = auth_agent.with_config({"callbacks": [langfuse_handler]})
+
 
     multi_agent_builder = StateGraph(State, config_schema=Configuration)
     multi_agent_builder.add_node("appointment_agent", appointment_agent)
@@ -253,9 +260,12 @@ def build_agent(add_checkpoint: bool = False):
     multi_agent_builder.add_edge(START, "appointment_agent")
 
     if add_checkpoint:
-        return multi_agent_builder.compile(name="multi_agent", checkpointer=MemorySaver())
+        compiled_multi = multi_agent_builder.compile(name="multi_agent", checkpointer=MemorySaver())
     else:
-        return multi_agent_builder.compile(name="multi_agent")
+        compiled_multi = multi_agent_builder.compile(name="multi_agent")
+
+    # Attach Langfuse tracing to the multi-agent graph
+    return compiled_multi.with_config({"callbacks": [langfuse_handler]})
 
 
 multi_agent = build_agent(add_checkpoint=True)
